@@ -1,0 +1,171 @@
+<html>
+    <title>Surya Namaskar Sets Audio Generator</title>
+    <body>
+        <h3>Surya Namaskar Sets Audio Generator</h3>
+        <h4>Change the values according to your preferences and click 'Start!'</h4>
+        Number of Sets: <input type="text" id="txtNumSets" value="2"/><br/>
+        Time for each set (seconds): <input type="text" id="txtTimeEachSet" value="24"/><br/>
+        Initial delay before start (seconds): <input type="text" id="txtDelay" value="0"/><br/>
+        First pause : Pause after <input type="text" id="txtFirstPauseCount" value=""/> Sets. &nbsp;Pause for <input type="text" id="txtFirstPauseSeconds" value="60"/> seconds<br/>
+        Second pause : Pause again after <input type="text" id="txtSecondPauseCount" value=""/> Sets. &nbsp;Pause for <input type="text" id="txtSecondPauseSeconds" value="60"/> seconds
+        <div>
+            <h1>
+                <span id="spanSet">  </span>
+                <br/>
+                <span id="spanStep">  </span>
+            </h1>
+        </div>
+        <div style="width:100%"">
+            <table style="width:100%"">
+                <tr>
+                    <td><input type="button" id="btnStart" value="Start" onclick="start()" style="font-size: 50px;"/></td>
+                    <td><input type="button" id="btnPause" value="Pause" onclick="pauseresume()" style="font-size: 50px;"/></td>
+                    <td><input type="button" id="btnStop" value="Stop" onclick="stop()" style="font-size: 50px;"/></td>
+                </tr>
+            </table>
+        </div>
+
+        <script>
+            const STEPS_IN_EACH_SET = 12;
+            let currentSet = 0;
+            let currentStep = 1;
+            let numSets = 108;
+            let secondsEachSet = 36;
+            let initialDelay = 15;
+            let millisecondsEachStep = 2500;
+            let spanSet = document.getElementById("spanSet");
+            let spanStep = document.getElementById("spanStep");
+            let stopped = false;
+            let lastStepTime = null;
+            let lastPrintTime = null;
+
+            let firstPauseCount = null;
+            let firstPauseSeconds = 60;
+
+            let secondPauseCount = null;
+            let secondPauseSeconds = 60;
+
+            function print(message) {
+                let string = "";
+
+                if (lastPrintTime == null) {
+                    lastPrintTime = new Date();
+                    string = lastPrintTime.toLocaleTimeString();
+                } else {
+                    let datetime = new Date();
+                    string = datetime - lastPrintTime;
+                    string += " milliseconds later";
+                    lastPrintTime = datetime;
+                }
+
+                console.log(string + ": " + message)
+            }
+
+            function speakNumber(num, doUseTh, nextPartToExecute) {
+                let thString = doUseTh ? 'th' : '';
+                let speech = new SpeechSynthesisUtterance(num + thString);
+                let speechSpeed = 1;
+
+                if (millisecondsEachStep < 2000 && millisecondsEachStep >= 1000) {
+                    speechSpeed = 1.5;
+                } else if (millisecondsEachStep < 1000) {
+                    speechSpeed = 10;
+                    if (!doUseTh) {
+                        // No point in speaking numbers at this speed.
+                        speech = new SpeechSynthesisUtterance("b");
+                    }
+                }
+
+                speech.rate = doUseTh ? speechSpeed * 1.5 : speechSpeed;
+                if (nextPartToExecute === 3) {
+                    lastStepTime = new Date();
+                }
+                window.speechSynthesis.speak(speech);
+                speech.onend = function (event) {
+                // save the speakDuration
+                speakUntil(nextPartToExecute);
+            };
+            }
+
+            function fetchValue(id) {
+                let element = document.getElementById(id);
+                let retVal = null;
+                if (element) {
+                    retVal = parseInt(element.value, 10);
+                }
+
+                if (isNaN(retVal)) {
+                    return null;
+                }
+
+                return retVal;
+            }
+
+            function start() {
+                stopped = false;
+                numSets = fetchValue("txtNumSets");
+                print("numSets : " + numSets);
+                secondsEachSet = fetchValue("txtTimeEachSet");
+                print("secondsEachSet : " + secondsEachSet);
+                initialDelay = fetchValue("txtDelay");
+                print("initialDelay : " + initialDelay);
+                millisecondsEachStep = secondsEachSet / STEPS_IN_EACH_SET * 1000;
+                print("millisecondsEachStep: " + millisecondsEachStep);
+
+                firstPauseCount = fetchValue("txtFirstPauseCount");
+                firstPauseSeconds = fetchValue("txtFirstPauseSeconds");
+                secondPauseCount = fetchValue("txtSecondPauseCount");
+                secondPauseSeconds = fetchValue("txtSecondPauseSeconds");
+
+                window.setTimeout(speakUntil, initialDelay * 1000);
+            }
+
+            function stop() {
+                stopped = true;
+                currentSet = 0;
+                currentStep = 1;
+            }
+
+            function speakUntil(part) {
+                if (stopped)
+                    return;
+
+                if ((!part || part == 1) && currentStep > 1) {
+                    part = 2;
+                }
+
+                if (!part || part == 1) {
+                    if (currentStep == 1) {
+                        currentSet++;
+                        if (currentSet > numSets) {
+                            return;
+                        }
+                        spanSet.innerHTML = "Set " + currentSet;
+                        print("CurrentSet : " + currentSet);
+                        speakNumber(currentSet, true, 2);
+                    } else {
+                        part = 2;
+                    }
+                }
+
+                if (part == 2) {
+                    spanStep.innerHTML = "Step " + currentStep;
+                    print("currentStep : " + currentStep);
+                    speakNumber(currentStep, false, 3);
+                } else if (part == 3) {
+                    if (++currentStep == 13) {
+                        currentStep = 1;
+                        if (firstPauseCount && firstPauseCount == currentSet) {
+                            // delay.
+                            speakNumber("Waiting for " + firstPauseSeconds + " seconds.");
+                        }
+                    }
+                    let now = new Date();
+                    // Since the beginning of speaking the step number, some time has already passed.
+                    window.setTimeout(function () {speakUntil(1);}, millisecondsEachStep - (now - lastStepTime));
+                }
+            }
+    </script>
+    </body>
+</html>
+
